@@ -134,6 +134,10 @@ pub struct Item {
     /// The layout gave this item its shortcut (⌘Q on the app's Quit, ⌘, on Settings): the app's
     /// key handling doesn't know it, so a backend reports the key equivalent as a click.
     pub layout_shortcut: bool,
+    /// The item removes something, as Delete: the egui bar draws its label in the error colour
+    /// while it can be chosen, so that it stands out from its neighbours. Native menus draw it as
+    /// any other item.
+    pub removes: bool,
 }
 
 /// A plain item, or one with a checked state.
@@ -253,6 +257,7 @@ impl Item {
             role: None,
             platforms: Platforms::ALL,
             layout_shortcut: false,
+            removes: false,
         }
     }
 
@@ -285,6 +290,12 @@ impl Item {
 
     pub fn platforms(mut self, platforms: Platforms) -> Item {
         self.platforms = platforms;
+        self
+    }
+
+    /// Mark the item as one that removes something ([`Item::removes`]).
+    pub fn removes(mut self, removes: bool) -> Item {
+        self.removes = removes;
         self
     }
 }

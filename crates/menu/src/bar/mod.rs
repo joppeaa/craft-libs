@@ -528,7 +528,10 @@ impl Draw<'_> {
         };
         let shortcut = it.shortcut.map(|c| c.display(self.platform));
         let underline = mnemonic.filter(|_| nav.underline);
-        let mut button = egui::Button::new(marks.text(ui, mark, label, underline));
+        // What removes is drawn in the error colour while it can be chosen; disabled, it is grey
+        // as any other item.
+        let colour = if it.removes && enabled { ui.visuals().error_fg_color } else { Color32::PLACEHOLDER };
+        let mut button = egui::Button::new(marks.text(ui, mark, label, underline, colour));
         if let Some(s) = &shortcut {
             button = button.shortcut_text(s.as_str());
         }
@@ -549,7 +552,7 @@ impl Draw<'_> {
     fn submenu(&mut self, ui: &mut Ui, depth: usize, shown: (&str, Option<char>), children: &[Node], marks: &Marks, nav: &mut Nav) {
         let (label, mnemonic) = shown;
         let enabled = any_enabled(children, self.gate);
-        let text = marks.text(ui, None, label, mnemonic.filter(|_| nav.underline));
+        let text = marks.text(ui, None, label, mnemonic.filter(|_| nav.underline), Color32::PLACEHOLDER);
         ui.add_enabled_ui(enabled, |ui| {
             nav.row(ui, depth - 1, enabled, None, mnemonic, |ui, nav| {
                 let (response, open) = submenu_row(ui, text, |ui| {
@@ -587,10 +590,10 @@ impl Marks {
         Marks { font, gutter }
     }
 
-    /// A row's text: `mark` in the column, then the label with `mnemonic` underlined. The text
-    /// takes the button's color (dimmed when disabled).
-    fn text(&self, ui: &Ui, mark: Option<&str>, label: &str, mnemonic: Option<char>) -> WidgetText {
-        let plain = TextFormat { font_id: self.font.clone(), color: Color32::PLACEHOLDER, ..Default::default() };
+    /// A row's text: `mark` in the column, then the label with `mnemonic` underlined, in `color`;
+    /// with [`Color32::PLACEHOLDER`] the text takes the button's color (dimmed when disabled).
+    fn text(&self, ui: &Ui, mark: Option<&str>, label: &str, mnemonic: Option<char>, color: Color32) -> WidgetText {
+        let plain = TextFormat { font_id: self.font.clone(), color, ..Default::default() };
         let mut job = LayoutJob::default();
         job.wrap.max_width = f32::INFINITY;
         let mut lead = self.gutter;

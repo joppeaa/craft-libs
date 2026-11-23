@@ -87,6 +87,8 @@ struct Bar {
     after: Option<f32>,
     /// The viewport commands the bar sent.
     sent: Vec<egui::ViewportCommand>,
+    /// Each text painted in the last frame, with the color it was given.
+    texts: Vec<(String, egui::Color32)>,
 }
 
 impl Bar {
@@ -113,6 +115,7 @@ impl Bar {
             fit: None,
             after: None,
             sent: Vec::new(),
+            texts: Vec::new(),
         };
         b.run(3);
         b
@@ -146,6 +149,17 @@ impl Bar {
             }
         });
         full.textures_delta.clear();
+        self.texts = full
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::epaint::Shape::Text(t) => {
+                    let set = t.galley.job.sections.iter().map(|s| s.format.color).find(|c| *c != egui::Color32::PLACEHOLDER);
+                    Some((t.galley.text().to_owned(), set.unwrap_or(t.fallback_color)))
+                }
+                _ => None,
+            })
+            .collect();
         self.after = after;
         if let Some(root) = full.viewport_output.remove(&egui::ViewportId::ROOT) {
             self.sent.extend(root.commands);
@@ -293,6 +307,25 @@ fn press_drag_release_runs_an_item() {
     b.button(false);
     b.run(2);
     assert_eq!(b.take(), vec![CommandRef::new("file.open")]);
+}
+
+/// An item marked as removing is drawn in the error colour while it can be chosen, its
+/// neighbours in the text colour; disabled, it is grey as any other item.
+#[test]
+fn an_item_that_removes_is_drawn_in_the_error_colour() {
+    let mut bar = sample();
+    let edit = &mut bar.menus[1].children;
+    edit.push(Node::Separator);
+    edit.push(item("edit.delete", "Delete").removes(true).into());
+    edit.push(item("edit.purge", "Purge").removes(true).enabled(false).into());
+    let mut b = Bar::new(bar, vec2(640.0, 400.0));
+    b.click("Edit");
+    let red = b.ctx.global_style().visuals.error_fg_color;
+    let colour = |b: &Bar, label: &str| b.texts.iter().find(|(t, _)| t == label).map(|(_, c)| *c);
+    assert_eq!(colour(&b, "Delete"), Some(red));
+    assert!(colour(&b, "Undo").is_some_and(|c| c != red), "its neighbours keep the text colour");
+    assert!(colour(&b, "Purge").is_some_and(|c| c != red), "disabled, it is grey");
+    assert!(!item("edit.undo", "Undo").removes, "an item removes nothing unless it says so");
 }
 
 #[test]
